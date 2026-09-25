@@ -190,6 +190,12 @@ function extrairHorasDaLinha(props) {
   return parseTempoTexto(textoTempo);
 }
 
+// Cache curtinho em memória: com o painel atualizando a cada 1s (e talvez
+// várias abas abertas), isso evita estourar o limite do Notion (~3 req/s).
+const CACHE_MS = 1000;
+let cache = { quando: 0, corpo: null };
+let emAndamento = null; // compartilha a mesma consulta entre chamadas simultâneas
+
 module.exports = async (req, res) => {
   try {
     if (!NOTION_TOKEN || !DATABASE_ID) {
@@ -197,6 +203,33 @@ module.exports = async (req, res) => {
       return;
     }
 
+    // Deixa a CDN da Vercel segurar a resposta por 1s e servir a antiga
+    // enquanto busca a nova — várias pessoas olhando = 1 consulta por segundo.
+    res.setHeader('Cache-Control', 's-maxage=1, stale-while-revalidate=5');
+
+    if (cache.corpo && Date.now() - cache.quando < CACHE_MS) {
+      res.status(200).json(cache.corpo);
+      return;
+    }
+
+    if (!emAndamento) {
+      emAndamento = montarResposta().finally(() => { emAndamento = null; });
+    }
+    const corpo = await emAndamento;
+    cache = { quando: Date.now(), corpo };
+    res.status(200).json(corpo);
+  } catch (err) {
+    // Se o Notion recusar (ex: 429 por excesso de chamadas), devolve o último dado bom
+    if (cache.corpo) {
+      res.status(200).json(cache.corpo);
+      return;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(500).json({ error: err.message });
+  }
+};
+
+async function montarResposta() {
     const { inicio, fimExclusivo } = intervaloDaSemana();
     const paginas = await consultarNotion(inicio.toISOString(), fimExclusivo.toISOString());
 
@@ -215,15 +248,12 @@ module.exports = async (req, res) => {
       porPessoa[nome].tags[tag] = (porPessoa[nome].tags[tag] || 0) + horas;
     }
 
-    res.status(200).json({
+    return {
       semana: {
         inicio: inicio.toISOString().slice(0, 10),
         fim: new Date(fimExclusivo.getTime() - 86400000).toISOString().slice(0, 10),
       },
       pessoas: porPessoa,
       totalEntradas: paginas.length,
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+    };
+}
