@@ -18,9 +18,14 @@ const PROP_INICIO = process.env.PROP_INICIO || 'Início';
 
 // Propriedades numéricas usadas para somar o tempo de cada linha.
 // "Tempo" costuma ser uma fórmula de TEXTO (ex: "10 h e 3 min"), então
-// somamos direto pelas duas colunas numéricas que geram esse texto.
+// somamos direto pelas colunas numéricas que geram esse texto.
 const PROP_HORA_TOTAL = process.env.PROP_HORA_TOTAL || 'Hora Total';
 const PROP_MINUTOS_TOTAIS = process.env.PROP_MINUTOS_TOTAIS || 'Minutos Totais';
+
+// Fallback: quando Hora Total / Minutos Totais estiverem vazios,
+// soma da mesma forma usando Hora Registro / Minuto Registro.
+const PROP_HORA_REGISTRO = process.env.PROP_HORA_REGISTRO || 'Hora Registro';
+const PROP_MINUTO_REGISTRO = process.env.PROP_MINUTO_REGISTRO || 'Minuto Registro';
 
 // Cores por pessoa (pode sobrescrever via env se quiser)
 const CORES = {
@@ -151,15 +156,34 @@ function parseTempoTexto(texto) {
 
 // Soma o tempo de uma linha em horas decimais. Prioridade:
 // 1) Hora Total + Minutos Totais (numéricas, mais confiável)
-// 2) Texto de "Tempo" (fallback, caso as colunas acima não existam)
-function extrairHorasDaLinha(props) {
-  const propHoraTotal = props[PROP_HORA_TOTAL];
-  const propMinutosTotais = props[PROP_MINUTOS_TOTAIS];
+// 2) Hora Registro + Minuto Registro (mesmo cálculo, usado quando as
+//    colunas acima estiverem vazias nessa linha)
+// 3) Texto de "Tempo" (último fallback, caso nenhuma das colunas acima exista)
+function valorPreenchido(prop) {
+  if (!prop) return false;
+  if (prop.type === 'number') return prop.number !== null && prop.number !== undefined;
+  if (prop.type === 'formula' && prop.formula.type === 'number') {
+    return prop.formula.number !== null && prop.formula.number !== undefined;
+  }
+  if (prop.type === 'rollup' && prop.rollup.type === 'number') {
+    return prop.rollup.number !== null && prop.rollup.number !== undefined;
+  }
+  return false;
+}
 
-  if (propHoraTotal || propMinutosTotais) {
-    const horaTotal = extrairNumero(propHoraTotal);
-    const minutosTotais = extrairNumero(propMinutosTotais);
-    return horaTotal + minutosTotais / 60;
+function extrairHorasDaLinha(props) {
+  const horaTotalProp = props[PROP_HORA_TOTAL];
+  const minutosTotaisProp = props[PROP_MINUTOS_TOTAIS];
+
+  if (valorPreenchido(horaTotalProp) || valorPreenchido(minutosTotaisProp)) {
+    return extrairNumero(horaTotalProp) + extrairNumero(minutosTotaisProp) / 60;
+  }
+
+  const horaRegistroProp = props[PROP_HORA_REGISTRO];
+  const minutoRegistroProp = props[PROP_MINUTO_REGISTRO];
+
+  if (valorPreenchido(horaRegistroProp) || valorPreenchido(minutoRegistroProp)) {
+    return extrairNumero(horaRegistroProp) + extrairNumero(minutoRegistroProp) / 60;
   }
 
   const textoTempo = extrairTexto(props[PROP_TEMPO]);
