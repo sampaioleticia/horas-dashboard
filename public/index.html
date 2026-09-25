@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Horas da Semana</title>
+<style>
+  :root {
+    --bg: #191919;
+    --border: rgba(255,255,255,0.07);
+    --text: #e9e9e7;
+    --muted: #8a8a88;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    --serif: Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--serif);
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 56px 24px 64px;
+  }
+
+  h1 {
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #fdfdfc;
+    margin: 0 0 4px;
+  }
+
+  .periodo {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 24px;
+  }
+
+  .abas {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .aba {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    padding: 8px 4px 10px;
+    margin-right: 16px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+  }
+
+  .aba.ativa {
+    color: var(--text);
+    border-bottom-color: var(--text);
+  }
+
+  .linha-pessoa {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ponto {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .linha-pessoa .nome {
+    flex: 1;
+    font-size: 14px;
+  }
+
+  .linha-pessoa .barra-fundo {
+    flex: 2;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .linha-pessoa .barra {
+    height: 100%;
+    border-radius: 3px;
+  }
+
+  .linha-pessoa .horas {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--muted);
+    width: 52px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .cartao-pessoa {
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .cartao-pessoa:last-child { border-bottom: none; }
+
+  .cartao-info {
+    flex: 1;
+  }
+
+  .cartao-nome {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+
+  .legenda-tag {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--sans);
+    font-size: 11px;
+    color: var(--muted);
+    padding: 2px 0;
+  }
+
+  .legenda-tag .rotulo {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legenda-tag .quad {
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    flex-shrink: 0;
+  }
+
+  .vazio, .erro {
+    font-family: var(--sans);
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .erro { color: #ff7369; }
+</style>
+</head>
+<body>
+  <h1>Horas da semana</h1>
+  <div class="periodo" id="periodo">Carregando…</div>
+
+  <div class="abas">
+    <button class="aba ativa" data-aba="resumo">Resumo</button>
+    <button class="aba" data-aba="tags">Por tag</button>
+  </div>
+
+  <div id="resumo"></div>
+  <div id="tags" style="display:none"></div>
+
+  <script>
+    let ultimoDado = null;
+
+    document.querySelectorAll('.aba').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.aba').forEach((b) => b.classList.remove('ativa'));
+        btn.classList.add('ativa');
+        document.getElementById('resumo').style.display = btn.dataset.aba === 'resumo' ? '' : 'none';
+        document.getElementById('tags').style.display = btn.dataset.aba === 'tags' ? '' : 'none';
+      });
+    });
+
+    function fmt(h) {
+      return h.toFixed(1).replace('.', ',') + 'h';
+    }
+
+    function sombraCor(hex, fator) {
+      const c = hex.replace('#', '');
+      const r = parseInt(c.substring(0, 2), 16);
+      const g = parseInt(c.substring(2, 4), 16);
+      const b = parseInt(c.substring(4, 6), 16);
+      const mix = (ch) => Math.round(ch + (255 - ch) * fator);
+      return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+    }
+
+    function desenharRosca(tags, corBase) {
+      const entradas = Object.entries(tags).sort((a, b) => b[1] - a[1]);
+      const total = entradas.reduce((s, [, v]) => s + v, 0) || 1;
+      const raio = 34, centro = 40, circ = 2 * Math.PI * raio;
+      let acumulado = 0;
+      const arcos = entradas.map(([tag, valor], i) => {
+        const fatia = (valor / total) * circ;
+        const offset = circ - acumulado;
+        acumulado += fatia;
+        const cor = sombraCor(corBase, i * 0.16);
+        return `<circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="${cor}"
+          stroke-width="10" stroke-dasharray="${fatia} ${circ - fatia}"
+          stroke-dashoffset="${offset}" transform="rotate(-90 ${centro} ${centro})" />`;
+      }).join('');
+      return { svg: `<svg width="80" height="80" viewBox="0 0 80 80">${arcos}</svg>`, entradas };
+    }
+
+    function renderizar(dado) {
+      const pessoas = Object.entries(dado.pessoas).sort((a, b) => b[1].total - a[1].total);
+      const periodo = document.getElementById('periodo');
+      const resumo = document.getElementById('resumo');
+      const tagsEl = document.getElementById('tags');
+
+      periodo.textContent = `${dado.semana.inicio} — ${dado.semana.fim} · ${dado.totalEntradas} registro${dado.totalEntradas === 1 ? '' : 's'}`;
+
+      if (pessoas.length === 0) {
+        resumo.innerHTML = '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
+        tagsEl.innerHTML = '';
+        return;
+      }
+
+      const maior = Math.max(...pessoas.map(([, p]) => p.total), 1);
+
+      resumo.innerHTML = pessoas.map(([nome, p]) => `
+        <div class="linha-pessoa">
+          <span class="ponto" style="background:${p.cor}"></span>
+          <span class="nome">${nome}</span>
+          <span class="barra-fundo"><span class="barra" style="width:${(p.total / maior) * 100}%; background:${p.cor}"></span></span>
+          <span class="horas">${fmt(p.total)}</span>
+        </div>
+      `).join('');
+
+      tagsEl.innerHTML = pessoas.map(([nome, p]) => {
+        const { svg, entradas } = desenharRosca(p.tags, p.cor);
+        const legenda = entradas.map(([tag, valor], i) => `
+          <div class="legenda-tag">
+            <span class="rotulo"><span class="quad" style="background:${sombraCor(p.cor, i * 0.16)}"></span>${tag}</span>
+            <span>${fmt(valor)}</span>
+          </div>
+        `).join('');
+        return `
+          <div class="cartao-pessoa">
+            ${svg}
+            <div class="cartao-info">
+              <div class="cartao-nome"><span class="ponto" style="background:${p.cor}"></span>${nome} · ${fmt(p.total)}</div>
+              ${legenda}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function atualizar() {
+      fetch('/api/dados')
+        .then((r) => r.json())
+        .then((dado) => {
+          if (dado.error) {
+            document.getElementById('periodo').innerHTML = `<span class="erro">Erro: ${dado.error}</span>`;
+            return;
+          }
+          ultimoDado = dado;
+          renderizar(dado);
+        })
+        .catch((err) => {
+          document.getElementById('periodo').innerHTML = `<span class="erro">Erro ao carregar: ${err.message}</span>`;
+        });
+    }
+
+    atualizar();
+    setInterval(atualizar, 30000);
+  </script>
+</body>
+</html>
