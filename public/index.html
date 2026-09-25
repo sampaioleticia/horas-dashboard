@@ -221,22 +221,34 @@
     }
 
     function desenharRosca(tags) {
-      const entradas = Object.entries(tags).sort((a, b) => b[1] - a[1]);
+      const entradas = Object.entries(tags)
+        .filter(([, v]) => v > 0)
+        .sort((a, b) => b[1] - a[1]);
       const total = entradas.reduce((s, [, v]) => s + v, 0) || 1;
-      const raio = 34, centro = 44, circ = 2 * Math.PI * raio;
+      const raio = 38, centro = 50, circ = 2 * Math.PI * raio;
       const gap = entradas.length > 1 ? 3 : 0;
       let acumulado = 0;
+
       const arcos = entradas.map(([tag, valor]) => {
         const fatiaBruta = (valor / total) * circ;
-        const fatia = Math.max(fatiaBruta - gap, 1);
+        const fatia = Math.max(fatiaBruta - gap, Math.min(fatiaBruta, 2));
         const offset = circ - acumulado;
         acumulado += fatiaBruta;
         const cor = corDaTag(tag);
         return `<circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="${cor}"
-          stroke-width="11" stroke-linecap="round" stroke-dasharray="${fatia} ${circ - fatia}"
+          stroke-width="12" stroke-linecap="round" stroke-dasharray="${fatia} ${circ - fatia}"
           stroke-dashoffset="${offset}" transform="rotate(-90 ${centro} ${centro})" />`;
       }).join('');
-      return { svg: `<svg width="88" height="88" viewBox="0 0 88 88">${arcos}</svg>`, entradas };
+
+      const svg = `<svg width="104" height="104" viewBox="0 0 100 100">
+        <circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="12" />
+        ${arcos}
+        <text x="${centro}" y="${centro + 5}" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          font-size="15" font-weight="600" fill="#e9e9e7">${fmt(total)}</text>
+      </svg>`;
+
+      return { svg, entradas };
     }
 
     function renderizar(dado) {
@@ -274,7 +286,7 @@
           <div class="cartao-pessoa">
             ${svg}
             <div class="cartao-info">
-              <div class="cartao-nome"><span class="ponto" style="background:${p.cor}"></span>${nome} · ${fmt(p.total)}</div>
+              <div class="cartao-nome"><span class="ponto" style="background:${p.cor}"></span>${nome}</div>
               ${legenda}
             </div>
           </div>
