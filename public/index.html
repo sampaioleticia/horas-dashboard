@@ -42,9 +42,10 @@
 
   .abas {
     display: flex;
-    gap: 4px;
+    gap: 0;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
+    margin-bottom: 20px;
+    overflow-x: auto;
   }
 
   .aba {
@@ -54,9 +55,11 @@
     background: none;
     border: none;
     padding: 8px 4px 10px;
-    margin-right: 16px;
+    margin-right: 18px;
     cursor: pointer;
     border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .aba.ativa {
@@ -93,27 +96,10 @@
     flex-shrink: 0;
   }
 
-  .cartao-pessoa {
-    padding: 22px 0;
-    border-bottom: 1px solid var(--border);
+  .rosca-wrap {
     display: flex;
-    align-items: center;
-    gap: 22px;
-  }
-
-  .cartao-pessoa:last-child { border-bottom: none; }
-
-  .cartao-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .cartao-nome {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 15px;
-    margin-bottom: 10px;
+    justify-content: center;
+    padding: 12px 0 24px;
   }
 
   .legenda-tag {
@@ -121,27 +107,48 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    font-family: var(--sans);
-    font-size: 12px;
-    color: var(--muted);
-    padding: 3px 0;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
   }
+
+  .legenda-tag:last-child { border-bottom: none; }
 
   .legenda-tag .rotulo {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 9px;
     min-width: 0;
+    font-size: 14px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .legenda-tag .quad {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 2px;
     flex-shrink: 0;
+  }
+
+  .legenda-tag .valores {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex-shrink: 0;
+    font-family: var(--sans);
+  }
+
+  .legenda-tag .horas-tag {
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .legenda-tag .pct-tag {
+    font-size: 11px;
+    color: var(--muted);
+    width: 32px;
+    text-align: right;
   }
 
   .vazio, .erro {
@@ -157,16 +164,27 @@
   <h1>Horas da semana</h1>
   <div class="periodo" id="periodo">Carregando…</div>
 
-  <div class="abas">
-    <button class="aba ativa" data-aba="resumo">Resumo</button>
-    <button class="aba" data-aba="tags">Por tag</button>
-  </div>
-
-  <div id="resumo"></div>
-  <div id="tags" style="display:none"></div>
+  <div class="abas" id="abas"></div>
+  <div id="conteudo"></div>
 
   <script>
     const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    const PESSOAS_FIXAS = ['Giovanna', 'Ana Elisa', 'Ana Beatriz', 'Letícia'];
+
+    let ultimoDado = null;
+    let abaAtiva = 'resumo';
+
+    function normalizar(txt) {
+      return txt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+
+    function encontrarPessoa(pessoas, rotulo) {
+      const alvo = normalizar(rotulo);
+      const chave = Object.keys(pessoas).find(
+        (nome) => normalizar(nome).includes(alvo) || alvo.includes(normalizar(nome))
+      );
+      return chave ? pessoas[chave] : null;
+    }
 
     function dataDescritiva(iso) {
       const [ano, mes, dia] = iso.split('-').map(Number);
@@ -176,20 +194,8 @@
     function formatarPeriodo(inicioISO, fimISO) {
       const i = dataDescritiva(inicioISO);
       const f = dataDescritiva(fimISO);
-      if (i.mes === f.mes) {
-        return `${i.dia} – ${f.dia} de ${MESES[f.mes - 1]}`;
-      }
-      return `${i.dia} de ${MESES[i.mes - 1]} – ${f.dia} de ${MESES[f.mes - 1]}`;
+      return `${i.dia} de ${MESES[i.mes - 1]} até ${f.dia} de ${MESES[f.mes - 1]}`;
     }
-
-    document.querySelectorAll('.aba').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.aba').forEach((b) => b.classList.remove('ativa'));
-        btn.classList.add('ativa');
-        document.getElementById('resumo').style.display = btn.dataset.aba === 'resumo' ? '' : 'none';
-        document.getElementById('tags').style.display = btn.dataset.aba === 'tags' ? '' : 'none';
-      });
-    });
 
     function fmt(h) {
       return h.toFixed(1).replace('.', ',') + 'h';
@@ -220,78 +226,98 @@
       return PALETA_FALLBACK[Math.abs(hash) % PALETA_FALLBACK.length];
     }
 
-    function desenharRosca(tags) {
+    function desenharRosca(tags, corPessoa) {
       const entradas = Object.entries(tags)
         .filter(([, v]) => v > 0)
         .sort((a, b) => b[1] - a[1]);
       const total = entradas.reduce((s, [, v]) => s + v, 0) || 1;
-      const raio = 38, centro = 50, circ = 2 * Math.PI * raio;
-      const gap = entradas.length > 1 ? 3 : 0;
+      const raio = 52, centro = 64, circ = 2 * Math.PI * raio;
+      const gap = entradas.length > 1 ? 4 : 0;
       let acumulado = 0;
 
       const arcos = entradas.map(([tag, valor]) => {
         const fatiaBruta = (valor / total) * circ;
-        const fatia = Math.max(fatiaBruta - gap, Math.min(fatiaBruta, 2));
+        const fatia = Math.max(fatiaBruta - gap, Math.min(fatiaBruta, 3));
         const offset = circ - acumulado;
         acumulado += fatiaBruta;
         const cor = corDaTag(tag);
         return `<circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="${cor}"
-          stroke-width="12" stroke-linecap="round" stroke-dasharray="${fatia} ${circ - fatia}"
+          stroke-width="15" stroke-linecap="round" stroke-dasharray="${fatia} ${circ - fatia}"
           stroke-dashoffset="${offset}" transform="rotate(-90 ${centro} ${centro})" />`;
       }).join('');
 
-      const svg = `<svg width="104" height="104" viewBox="0 0 100 100">
-        <circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="12" />
+      const svg = `<svg width="152" height="152" viewBox="0 0 128 128">
+        <circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="15" />
         ${arcos}
-        <text x="${centro}" y="${centro + 5}" text-anchor="middle"
+        <text x="${centro}" y="${centro - 3}" text-anchor="middle"
           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="15" font-weight="600" fill="#e9e9e7">${fmt(total)}</text>
+          font-size="22" font-weight="700" fill="#fdfdfc">${fmt(total)}</text>
+        <text x="${centro}" y="${centro + 16}" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+          font-size="10" fill="${corPessoa}">essa semana</text>
       </svg>`;
 
-      return { svg, entradas };
+      return { svg, entradas, total };
     }
 
-    function renderizar(dado) {
+    function montarAbas() {
+      const abasEl = document.getElementById('abas');
+      const lista = ['Resumo', ...PESSOAS_FIXAS];
+      abasEl.innerHTML = lista.map((label) => {
+        const chave = label === 'Resumo' ? 'resumo' : label;
+        const ativa = chave === abaAtiva ? 'ativa' : '';
+        return `<button class="aba ${ativa}" data-aba="${chave}">${label}</button>`;
+      }).join('');
+
+      abasEl.querySelectorAll('.aba').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          abaAtiva = btn.dataset.aba;
+          montarAbas();
+          renderizarConteudo();
+        });
+      });
+    }
+
+    function renderizarResumo(dado) {
       const pessoas = Object.entries(dado.pessoas).sort((a, b) => b[1].total - a[1].total);
-      const periodo = document.getElementById('periodo');
-      const resumo = document.getElementById('resumo');
-      const tagsEl = document.getElementById('tags');
-
-      const periodoTexto = formatarPeriodo(dado.semana.inicio, dado.semana.fim);
-      periodo.textContent = periodoTexto;
-
       if (pessoas.length === 0) {
-        resumo.innerHTML = '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
-        tagsEl.innerHTML = '';
-        return;
+        return '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
       }
-
-      resumo.innerHTML = pessoas.map(([nome, p]) => `
+      return pessoas.map(([nome, p]) => `
         <div class="linha-pessoa">
           <span class="ponto" style="background:${p.cor}"></span>
           <span class="nome">${nome}</span>
           <span class="horas">${fmt(p.total)}</span>
         </div>
       `).join('');
+    }
 
-      tagsEl.innerHTML = pessoas.map(([nome, p]) => {
-        const { svg, entradas } = desenharRosca(p.tags);
-        const legenda = entradas.map(([tag, valor]) => `
-          <div class="legenda-tag">
-            <span class="rotulo"><span class="quad" style="background:${corDaTag(tag)}"></span>${tag}</span>
-            <span>${fmt(valor)}</span>
-          </div>
-        `).join('');
-        return `
-          <div class="cartao-pessoa">
-            ${svg}
-            <div class="cartao-info">
-              <div class="cartao-nome"><span class="ponto" style="background:${p.cor}"></span>${nome}</div>
-              ${legenda}
-            </div>
-          </div>
-        `;
-      }).join('');
+    function renderizarPessoa(dado, rotulo) {
+      const p = encontrarPessoa(dado.pessoas, rotulo);
+      if (!p || p.total <= 0) {
+        return '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
+      }
+      const { svg, entradas, total } = desenharRosca(p.tags, p.cor);
+      const legenda = entradas.map(([tag, valor]) => `
+        <div class="legenda-tag">
+          <span class="rotulo"><span class="quad" style="background:${corDaTag(tag)}"></span>${tag}</span>
+          <span class="valores">
+            <span class="horas-tag">${fmt(valor)}</span>
+            <span class="pct-tag">${Math.round((valor / total) * 100)}%</span>
+          </span>
+        </div>
+      `).join('');
+      return `<div class="rosca-wrap">${svg}</div>${legenda}`;
+    }
+
+    function renderizarConteudo() {
+      const conteudo = document.getElementById('conteudo');
+      if (!ultimoDado) return;
+      if (abaAtiva === 'resumo') {
+        conteudo.innerHTML = renderizarResumo(ultimoDado);
+      } else {
+        conteudo.innerHTML = renderizarPessoa(ultimoDado, abaAtiva);
+      }
     }
 
     function atualizar() {
@@ -302,13 +328,16 @@
             document.getElementById('periodo').innerHTML = `<span class="erro">Erro: ${dado.error}</span>`;
             return;
           }
-          renderizar(dado);
+          ultimoDado = dado;
+          document.getElementById('periodo').textContent = formatarPeriodo(dado.semana.inicio, dado.semana.fim);
+          renderizarConteudo();
         })
         .catch((err) => {
           document.getElementById('periodo').innerHTML = `<span class="erro">Erro ao carregar: ${err.message}</span>`;
         });
     }
 
+    montarAbas();
     atualizar();
     setInterval(atualizar, 30000);
   </script>
