@@ -20,7 +20,7 @@
     background: var(--bg);
     color: var(--text);
     font-family: var(--serif);
-    max-width: 520px;
+    max-width: 480px;
     margin: 0 auto;
     padding: 56px 24px 64px;
   }
@@ -37,14 +37,14 @@
     font-family: var(--sans);
     font-size: 12px;
     color: var(--muted);
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
 
   .abas {
     display: flex;
     gap: 4px;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
+    margin-bottom: 8px;
   }
 
   .aba {
@@ -67,42 +67,29 @@
   .linha-pessoa {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 0;
+    gap: 10px;
+    padding: 12px 0;
     border-bottom: 1px solid var(--border);
   }
 
+  .linha-pessoa:last-child { border-bottom: none; }
+
   .ponto {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
   }
 
   .linha-pessoa .nome {
     flex: 1;
-    font-size: 14px;
-  }
-
-  .linha-pessoa .barra-fundo {
-    flex: 2;
-    height: 6px;
-    background: rgba(255,255,255,0.06);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .linha-pessoa .barra {
-    height: 100%;
-    border-radius: 3px;
+    font-size: 15px;
   }
 
   .linha-pessoa .horas {
     font-family: var(--sans);
-    font-size: 12px;
+    font-size: 13px;
     color: var(--muted);
-    width: 52px;
-    text-align: right;
     flex-shrink: 0;
   }
 
@@ -154,6 +141,7 @@
     font-family: var(--sans);
     font-size: 13px;
     color: var(--muted);
+    padding-top: 8px;
   }
   .erro { color: #ff7369; }
 </style>
@@ -171,7 +159,21 @@
   <div id="tags" style="display:none"></div>
 
   <script>
-    let ultimoDado = null;
+    const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+
+    function dataDescritiva(iso) {
+      const [ano, mes, dia] = iso.split('-').map(Number);
+      return { dia, mes };
+    }
+
+    function formatarPeriodo(inicioISO, fimISO) {
+      const i = dataDescritiva(inicioISO);
+      const f = dataDescritiva(fimISO);
+      if (i.mes === f.mes) {
+        return `${i.dia} – ${f.dia} de ${MESES[f.mes - 1]}`;
+      }
+      return `${i.dia} de ${MESES[i.mes - 1]} – ${f.dia} de ${MESES[f.mes - 1]}`;
+    }
 
     document.querySelectorAll('.aba').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -218,7 +220,8 @@
       const resumo = document.getElementById('resumo');
       const tagsEl = document.getElementById('tags');
 
-      periodo.textContent = `${dado.semana.inicio} — ${dado.semana.fim} · ${dado.totalEntradas} registro${dado.totalEntradas === 1 ? '' : 's'}`;
+      const periodoTexto = formatarPeriodo(dado.semana.inicio, dado.semana.fim);
+      periodo.textContent = `${periodoTexto} · ${dado.totalEntradas} registro${dado.totalEntradas === 1 ? '' : 's'}`;
 
       if (pessoas.length === 0) {
         resumo.innerHTML = '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
@@ -226,13 +229,10 @@
         return;
       }
 
-      const maior = Math.max(...pessoas.map(([, p]) => p.total), 1);
-
       resumo.innerHTML = pessoas.map(([nome, p]) => `
         <div class="linha-pessoa">
           <span class="ponto" style="background:${p.cor}"></span>
           <span class="nome">${nome}</span>
-          <span class="barra-fundo"><span class="barra" style="width:${(p.total / maior) * 100}%; background:${p.cor}"></span></span>
           <span class="horas">${fmt(p.total)}</span>
         </div>
       `).join('');
@@ -265,7 +265,6 @@
             document.getElementById('periodo').innerHTML = `<span class="erro">Erro: ${dado.error}</span>`;
             return;
           }
-          ultimoDado = dado;
           renderizar(dado);
         })
         .catch((err) => {
