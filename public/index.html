@@ -108,10 +108,7 @@
     align-items: center;
     gap: 12px;
     padding: 10px 0;
-    border-bottom: 1px solid var(--border);
   }
-
-  .legenda-tag:last-child { border-bottom: none; }
 
   .legenda-tag .rotulo {
     display: flex;
@@ -201,23 +198,23 @@
       return h.toFixed(1).replace('.', ',') + 'h';
     }
 
-    // Cor fixa por tag (independente da pessoa), baseada na paleta de tags do Notion.
+    // Cor fixa por tag (independente da pessoa) — paleta harmônica e legível no fundo escuro.
     const CORES_TAG = {
-      'Atualização do Site/Moodle': '#64748b',
-      'Comunicação': '#4c9a2a',
-      'Confecção Notícia': '#8a67ab',
-      'Design': '#487ca5',
-      'Edição conteúdo Instagram': '#b35488',
-      'Edição de vídeo Youtube': '#5b6fd8',
-      'Escrita/Revisão de artigo': '#3f9142',
-      'Evento/Aula do Projeto': '#c98a4b',
-      'Leitura Científica': '#3f6fc9',
-      'Organização Grupo': '#c4554d',
-      'Outros': '#8a8a88',
-      'Reunião/Planejamento Reunião': '#976d57',
-      'Revisão de vídeo/post': '#a34a86',
+      'Atualização do Site/Moodle': '#6b8fb5',
+      'Comunicação': '#5fae72',
+      'Confecção Notícia': '#a084d1',
+      'Design': '#5b9bd5',
+      'Edição conteúdo Instagram': '#d1729a',
+      'Edição de vídeo Youtube': '#7c8ee6',
+      'Escrita/Revisão de artigo': '#4fae94',
+      'Evento/Aula do Projeto': '#d19a5a',
+      'Leitura Científica': '#6a89d8',
+      'Organização Grupo': '#d97a6c',
+      'Outros': '#c9b45c',
+      'Reunião/Planejamento Reunião': '#b08968',
+      'Revisão de vídeo/post': '#c26ba0',
     };
-    const PALETA_FALLBACK = ['#64748b','#4c9a2a','#8a67ab','#487ca5','#b35488','#5b6fd8','#3f9142','#c98a4b','#3f6fc9','#c4554d','#976d57','#a34a86'];
+    const PALETA_FALLBACK = ['#6b8fb5','#5fae72','#a084d1','#5b9bd5','#d1729a','#7c8ee6','#4fae94','#d19a5a','#6a89d8','#d97a6c','#c9b45c','#b08968','#c26ba0'];
 
     function corDaTag(tag) {
       if (CORES_TAG[tag]) return CORES_TAG[tag];
@@ -249,12 +246,9 @@
       const svg = `<svg width="152" height="152" viewBox="0 0 128 128">
         <circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="15" />
         ${arcos}
-        <text x="${centro}" y="${centro - 3}" text-anchor="middle"
+        <text x="${centro}" y="${centro + 7}" text-anchor="middle"
           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="22" font-weight="700" fill="#fdfdfc">${fmt(total)}</text>
-        <text x="${centro}" y="${centro + 16}" text-anchor="middle"
-          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="10" fill="${corPessoa}">essa semana</text>
+          font-size="24" font-weight="700" fill="#fdfdfc">${fmt(total)}</text>
       </svg>`;
 
       return { svg, entradas, total };
