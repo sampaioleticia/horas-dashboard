@@ -94,46 +94,53 @@
   }
 
   .cartao-pessoa {
-    padding: 20px 0;
+    padding: 22px 0;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 22px;
   }
 
   .cartao-pessoa:last-child { border-bottom: none; }
 
   .cartao-info {
     flex: 1;
+    min-width: 0;
   }
 
   .cartao-nome {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
-    margin-bottom: 8px;
+    font-size: 15px;
+    margin-bottom: 10px;
   }
 
   .legenda-tag {
     display: flex;
     justify-content: space-between;
+    align-items: center;
+    gap: 12px;
     font-family: var(--sans);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--muted);
-    padding: 2px 0;
+    padding: 3px 0;
   }
 
   .legenda-tag .rotulo {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .legenda-tag .quad {
-    width: 6px;
-    height: 6px;
-    border-radius: 1px;
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
     flex-shrink: 0;
   }
 
@@ -188,30 +195,48 @@
       return h.toFixed(1).replace('.', ',') + 'h';
     }
 
-    function sombraCor(hex, fator) {
-      const c = hex.replace('#', '');
-      const r = parseInt(c.substring(0, 2), 16);
-      const g = parseInt(c.substring(2, 4), 16);
-      const b = parseInt(c.substring(4, 6), 16);
-      const mix = (ch) => Math.round(ch + (255 - ch) * fator);
-      return `rgb(${mix(r)}, ${mix(g)}, ${mix(b)})`;
+    // Cor fixa por tag (independente da pessoa), baseada na paleta de tags do Notion.
+    const CORES_TAG = {
+      'Atualização do Site/Moodle': '#64748b',
+      'Comunicação': '#4c9a2a',
+      'Confecção Notícia': '#8a67ab',
+      'Design': '#487ca5',
+      'Edição conteúdo Instagram': '#b35488',
+      'Edição de vídeo Youtube': '#5b6fd8',
+      'Escrita/Revisão de artigo': '#3f9142',
+      'Evento/Aula do Projeto': '#c98a4b',
+      'Leitura Científica': '#3f6fc9',
+      'Organização Grupo': '#c4554d',
+      'Outros': '#8a8a88',
+      'Reunião/Planejamento Reunião': '#976d57',
+      'Revisão de vídeo/post': '#a34a86',
+    };
+    const PALETA_FALLBACK = ['#64748b','#4c9a2a','#8a67ab','#487ca5','#b35488','#5b6fd8','#3f9142','#c98a4b','#3f6fc9','#c4554d','#976d57','#a34a86'];
+
+    function corDaTag(tag) {
+      if (CORES_TAG[tag]) return CORES_TAG[tag];
+      let hash = 0;
+      for (let i = 0; i < tag.length; i++) hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+      return PALETA_FALLBACK[Math.abs(hash) % PALETA_FALLBACK.length];
     }
 
-    function desenharRosca(tags, corBase) {
+    function desenharRosca(tags) {
       const entradas = Object.entries(tags).sort((a, b) => b[1] - a[1]);
       const total = entradas.reduce((s, [, v]) => s + v, 0) || 1;
-      const raio = 34, centro = 40, circ = 2 * Math.PI * raio;
+      const raio = 34, centro = 44, circ = 2 * Math.PI * raio;
+      const gap = entradas.length > 1 ? 3 : 0;
       let acumulado = 0;
-      const arcos = entradas.map(([tag, valor], i) => {
-        const fatia = (valor / total) * circ;
+      const arcos = entradas.map(([tag, valor]) => {
+        const fatiaBruta = (valor / total) * circ;
+        const fatia = Math.max(fatiaBruta - gap, 1);
         const offset = circ - acumulado;
-        acumulado += fatia;
-        const cor = sombraCor(corBase, i * 0.16);
+        acumulado += fatiaBruta;
+        const cor = corDaTag(tag);
         return `<circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="${cor}"
-          stroke-width="10" stroke-dasharray="${fatia} ${circ - fatia}"
+          stroke-width="11" stroke-linecap="round" stroke-dasharray="${fatia} ${circ - fatia}"
           stroke-dashoffset="${offset}" transform="rotate(-90 ${centro} ${centro})" />`;
       }).join('');
-      return { svg: `<svg width="80" height="80" viewBox="0 0 80 80">${arcos}</svg>`, entradas };
+      return { svg: `<svg width="88" height="88" viewBox="0 0 88 88">${arcos}</svg>`, entradas };
     }
 
     function renderizar(dado) {
@@ -221,7 +246,7 @@
       const tagsEl = document.getElementById('tags');
 
       const periodoTexto = formatarPeriodo(dado.semana.inicio, dado.semana.fim);
-      periodo.textContent = `${periodoTexto} · ${dado.totalEntradas} registro${dado.totalEntradas === 1 ? '' : 's'}`;
+      periodo.textContent = periodoTexto;
 
       if (pessoas.length === 0) {
         resumo.innerHTML = '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
@@ -238,10 +263,10 @@
       `).join('');
 
       tagsEl.innerHTML = pessoas.map(([nome, p]) => {
-        const { svg, entradas } = desenharRosca(p.tags, p.cor);
-        const legenda = entradas.map(([tag, valor], i) => `
+        const { svg, entradas } = desenharRosca(p.tags);
+        const legenda = entradas.map(([tag, valor]) => `
           <div class="legenda-tag">
-            <span class="rotulo"><span class="quad" style="background:${sombraCor(p.cor, i * 0.16)}"></span>${tag}</span>
+            <span class="rotulo"><span class="quad" style="background:${corDaTag(tag)}"></span>${tag}</span>
             <span>${fmt(valor)}</span>
           </div>
         `).join('');
