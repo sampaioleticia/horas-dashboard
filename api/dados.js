@@ -16,20 +16,32 @@ const PROP_TAG = process.env.PROP_TAG || 'Tag';
 const PROP_TEMPO = process.env.PROP_TEMPO || 'Tempo';
 const PROP_INICIO = process.env.PROP_INICIO || 'Início';
 
+// Propriedades numéricas usadas para somar o tempo de cada linha.
+// "Tempo" costuma ser uma fórmula de TEXTO (ex: "10 h e 3 min"), então
+// somamos direto pelas duas colunas numéricas que geram esse texto.
+const PROP_HORA_TOTAL = process.env.PROP_HORA_TOTAL || 'Hora Total';
+const PROP_MINUTOS_TOTAIS = process.env.PROP_MINUTOS_TOTAIS || 'Minutos Totais';
+
 // Cores por pessoa (pode sobrescrever via env se quiser)
 const CORES = {
   'Leticia Capitani': '#9b87f5',
   'Ana': '#5b9bd5',
+  'Ana Elisa': '#5b9bd5',
   'Ana Beatriz Eckert': '#e879a6',
+  'Ana Beatriz': '#e879a6',
   'Giovanna Cabral': '#52b8a3',
+  'Giovanna': '#52b8a3',
 };
 const COR_PADRAO = '#8a8a88';
 
 function corPara(nome) {
+  if (!nome) return COR_PADRAO;
   if (CORES[nome]) return CORES[nome];
-  const chave = Object.keys(CORES).find(
-    (k) => nome && (nome.includes(k.split(' ')[0]) || k.includes(nome))
-  );
+
+  // Correspondência parcial, mas priorizando a chave MAIS ESPECÍFICA
+  // (mais longa) primeiro, para "Ana Beatriz Eckert" não cair em "Ana".
+  const chaves = Object.keys(CORES).sort((a, b) => b.length - a.length);
+  const chave = chaves.find((k) => nome.includes(k) || k.includes(nome));
   return chave ? CORES[chave] : COR_PADRAO;
 }
 
@@ -109,6 +121,9 @@ function extrairTexto(prop) {
       return prop.rich_text && prop.rich_text.length
         ? prop.rich_text.map((t) => t.plain_text).join('')
         : null;
+    case 'formula':
+      if (prop.formula.type === 'string') return prop.formula.string;
+      return null;
     default:
       return null;
   }
@@ -120,6 +135,35 @@ function extrairNumero(prop) {
   if (prop.type === 'formula' && prop.formula.type === 'number') return prop.formula.number || 0;
   if (prop.type === 'rollup' && prop.rollup.type === 'number') return prop.rollup.number || 0;
   return 0;
+}
+
+// Tenta ler o texto do tipo "10 h e 3 min", "5 h" ou "45 min" e
+// converter para horas decimais. Usado só como último recurso, caso
+// as colunas numéricas (Hora Total / Minutos Totais) não existam.
+function parseTempoTexto(texto) {
+  if (!texto) return 0;
+  const horasMatch = texto.match(/(\d+)\s*h/i);
+  const minutosMatch = texto.match(/(\d+)\s*min/i);
+  const horas = horasMatch ? parseInt(horasMatch[1], 10) : 0;
+  const minutos = minutosMatch ? parseInt(minutosMatch[1], 10) : 0;
+  return horas + minutos / 60;
+}
+
+// Soma o tempo de uma linha em horas decimais. Prioridade:
+// 1) Hora Total + Minutos Totais (numéricas, mais confiável)
+// 2) Texto de "Tempo" (fallback, caso as colunas acima não existam)
+function extrairHorasDaLinha(props) {
+  const propHoraTotal = props[PROP_HORA_TOTAL];
+  const propMinutosTotais = props[PROP_MINUTOS_TOTAIS];
+
+  if (propHoraTotal || propMinutosTotais) {
+    const horaTotal = extrairNumero(propHoraTotal);
+    const minutosTotais = extrairNumero(propMinutosTotais);
+    return horaTotal + minutosTotais / 60;
+  }
+
+  const textoTempo = extrairTexto(props[PROP_TEMPO]);
+  return parseTempoTexto(textoTempo);
 }
 
 module.exports = async (req, res) => {
@@ -138,7 +182,7 @@ module.exports = async (req, res) => {
       const props = pagina.properties;
       const nome = extrairTexto(props[PROP_PESSOA]) || 'Sem pessoa';
       const tag = extrairTexto(props[PROP_TAG]) || 'Sem tag';
-      const horas = extrairNumero(props[PROP_TEMPO]);
+      const horas = extrairHorasDaLinha(props);
 
       if (!porPessoa[nome]) {
         porPessoa[nome] = { total: 0, cor: corPara(nome), tags: {} };
