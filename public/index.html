@@ -314,26 +314,48 @@
       }
     }
 
-    function atualizar() {
-      fetch('/api/dados')
-        .then((r) => r.json())
-        .then((dado) => {
-          if (dado.error) {
-            document.getElementById('periodo').innerHTML = `<span class="erro">Erro: ${dado.error}</span>`;
-            return;
-          }
+    const INTERVALO_MS = 1000; // atualiza a cada 1 segundo
+    let ultimoJSON = '';
+    let timer = null;
+
+    function mostrarErro(msg) {
+      // Se já temos dados na tela, não apaga nada por causa de uma falha pontual
+      if (ultimoDado) { console.warn(msg); return; }
+      document.getElementById('periodo').innerHTML = `<span class="erro">${msg}</span>`;
+    }
+
+    async function atualizar() {
+      clearTimeout(timer);
+      try {
+        const r = await fetch('/api/dados', { cache: 'no-store' });
+        const texto = await r.text();
+        const dado = JSON.parse(texto);
+        if (dado.error) {
+          mostrarErro(`Erro: ${dado.error}`);
+        } else if (texto !== ultimoJSON) {
+          // Só redesenha quando algo mudou (evita piscar a tela a cada segundo)
+          ultimoJSON = texto;
           ultimoDado = dado;
           document.getElementById('periodo').textContent = formatarPeriodo(dado.semana.inicio, dado.semana.fim);
           renderizarConteudo();
-        })
-        .catch((err) => {
-          document.getElementById('periodo').innerHTML = `<span class="erro">Erro ao carregar: ${err.message}</span>`;
-        });
+        }
+      } catch (err) {
+        mostrarErro(`Erro ao carregar: ${err.message}`);
+      } finally {
+        // Agenda a próxima só depois que esta terminou — nunca acumula requisições.
+        // Com a aba escondida, pausa (economiza o limite da API do Notion).
+        if (!document.hidden) timer = setTimeout(atualizar, INTERVALO_MS);
+      }
     }
+
+    // Ao voltar para a aba, atualiza na hora e retoma o ciclo
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) atualizar();
+      else clearTimeout(timer);
+    });
 
     montarAbas();
     atualizar();
-    setInterval(atualizar, 30000);
   </script>
 </body>
 </html>
