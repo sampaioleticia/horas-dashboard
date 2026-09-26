@@ -20,7 +20,7 @@
     background: var(--bg);
     color: var(--text);
     font-family: var(--serif);
-    max-width: 480px;
+    max-width: 560px;
     margin: 0 auto;
     padding: 56px 24px 64px;
   }
@@ -96,10 +96,26 @@
     flex-shrink: 0;
   }
 
-  .rosca-wrap {
+  .pessoa-layout {
     display: flex;
-    justify-content: center;
+    align-items: center;
+    gap: 24px;
     padding: 12px 0 24px;
+  }
+
+  .rosca-wrap {
+    flex-shrink: 0;
+  }
+
+  .legenda {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Em telas muito estreitas, volta a empilhar */
+  @media (max-width: 380px) {
+    .pessoa-layout { flex-direction: column; }
+    .legenda { width: 100%; }
   }
 
   .legenda-tag {
@@ -301,7 +317,11 @@
           </span>
         </div>
       `).join('');
-      return `<div class="rosca-wrap">${svg}</div>${legenda}`;
+      return `
+        <div class="pessoa-layout">
+          <div class="rosca-wrap">${svg}</div>
+          <div class="legenda">${legenda}</div>
+        </div>`;
     }
 
     function renderizarConteudo() {
