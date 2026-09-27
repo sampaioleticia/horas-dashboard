@@ -30,12 +30,12 @@ const PROP_MINUTO_REGISTRO = process.env.PROP_MINUTO_REGISTRO || 'Minuto Registr
 // Cores por pessoa (pode sobrescrever via env se quiser)
 const CORES = {
   'Leticia Capitani': '#9b87f5',
-  'Ana': '#5b9bd5',
-  'Ana Elisa': '#5b9bd5',
-  'Ana Beatriz Eckert': '#e879a6',
-  'Ana Beatriz': '#e879a6',
-  'Giovanna Cabral': '#52b8a3',
-  'Giovanna': '#52b8a3',
+  'Ana': '#52b8a3',
+  'Ana Elisa': '#52b8a3',          // verde
+  'Ana Beatriz Eckert': '#5b9bd5', // azul
+  'Ana Beatriz': '#5b9bd5',
+  'Giovanna Cabral': '#e879a6',    // rosa
+  'Giovanna': '#e879a6',
 };
 const COR_PADRAO = '#8a8a88';
 
