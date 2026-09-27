@@ -209,8 +209,14 @@
       return `${i.dia} de ${MESES[i.mes - 1]} até ${f.dia} de ${MESES[f.mes - 1]}`;
     }
 
+    // Converte horas decimais em "1h 36min", "2h" ou "45min"
     function fmt(h) {
-      return h.toFixed(1).replace('.', ',') + 'h';
+      const totalMin = Math.round(h * 60);
+      const horas = Math.floor(totalMin / 60);
+      const minutos = totalMin % 60;
+      if (horas === 0) return `${minutos}min`;
+      if (minutos === 0) return `${horas}h`;
+      return `${horas}h ${minutos}min`;
     }
 
     // Cor fixa por tag (independente da pessoa) — paleta harmônica e legível no fundo escuro.
@@ -288,7 +294,7 @@
         ${arcos}
         <text x="${centro}" y="${centro + 7}" text-anchor="middle"
           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="22" font-weight="700" fill="#fdfdfc">${fmt(total)}</text>
+          font-size="${fmt(total).length > 6 ? 17 : 22}" font-weight="700" fill="#fdfdfc">${fmt(total)}</text>
       </svg>`;
 
       return { svg, entradas, total };
