@@ -71,11 +71,8 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 0;
-    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
   }
-
-  .linha-pessoa:last-child { border-bottom: none; }
 
   .ponto {
     width: 7px;
@@ -98,13 +95,15 @@
 
   .pessoa-layout {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 24px;
     padding: 12px 0 24px;
   }
 
   .rosca-wrap {
     flex-shrink: 0;
+    position: sticky;
+    top: 16px;
   }
 
   .legenda {
@@ -123,7 +122,7 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
-    padding: 10px 0;
+    padding: 7px 0;
   }
 
   .legenda-tag .rotulo {
@@ -239,32 +238,57 @@
       return PALETA_FALLBACK[Math.abs(hash) % PALETA_FALLBACK.length];
     }
 
-    function desenharRosca(tags, corPessoa) {
+    // Ponto na circunferência; ângulo em radianos a partir do topo, sentido horário
+    function pontoNoCirculo(c, r, a) {
+      return [c + r * Math.sin(a), c - r * Math.cos(a)];
+    }
+
+    function caminhoArco(c, r, a0, a1) {
+      const [x0, y0] = pontoNoCirculo(c, r, a0);
+      const [x1, y1] = pontoNoCirculo(c, r, a1);
+      const grande = a1 - a0 > Math.PI ? 1 : 0;
+      return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${r} ${r} 0 ${grande} 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;
+    }
+
+    function desenharRosca(tags) {
       const entradas = Object.entries(tags)
         .filter(([, v]) => v > 0)
         .sort((a, b) => b[1] - a[1]);
       const total = entradas.reduce((s, [, v]) => s + v, 0) || 1;
-      const raio = 52, centro = 64, circ = 2 * Math.PI * raio;
-      const gap = entradas.length > 1 ? 4 : 0;
-      let acumulado = 0;
+      const raio = 52, centro = 64, espessura = 13;
+      const VOLTA = Math.PI * 2;
+      const GAP = 0.045;        // espaço entre fatias (~2,5°)
+      const MIN_VISIVEL = 0.03; // fatias minúsculas continuam aparecendo
 
-      const arcos = entradas.map(([tag, valor]) => {
-        const fatiaBruta = (valor / total) * circ;
-        const fatia = Math.max(fatiaBruta - gap, Math.min(fatiaBruta, 3));
-        const offset = circ - acumulado;
-        acumulado += fatiaBruta;
-        const cor = corDaTag(tag);
-        return `<circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="${cor}"
-          stroke-width="15" stroke-linecap="round" stroke-dasharray="${fatia} ${circ - fatia}"
-          stroke-dashoffset="${offset}" transform="rotate(-90 ${centro} ${centro})" />`;
-      }).join('');
+      let arcos = '';
+      if (entradas.length === 1) {
+        arcos = `<circle cx="${centro}" cy="${centro}" r="${raio}" fill="none"
+          stroke="${corDaTag(entradas[0][0])}" stroke-width="${espessura}" />`;
+      } else {
+        let angulo = 0;
+        arcos = entradas.map(([tag, valor]) => {
+          const fatia = (valor / total) * VOLTA;
+          const a0 = angulo;
+          angulo += fatia;
+          // gap proporcional: fatias pequenas não "somem" dentro do espaço
+          const g = Math.min(GAP, fatia * 0.35);
+          let ini = a0 + g / 2, fim = a0 + fatia - g / 2;
+          if (fim - ini < MIN_VISIVEL) {
+            const meio = (a0 + a0 + fatia) / 2;
+            ini = meio - MIN_VISIVEL / 2;
+            fim = meio + MIN_VISIVEL / 2;
+          }
+          return `<path d="${caminhoArco(centro, raio, ini, fim)}" fill="none"
+            stroke="${corDaTag(tag)}" stroke-width="${espessura}" stroke-linecap="butt" />`;
+        }).join('');
+      }
 
       const svg = `<svg width="152" height="152" viewBox="0 0 128 128">
-        <circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="15" />
+        <circle cx="${centro}" cy="${centro}" r="${raio}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="${espessura}" />
         ${arcos}
         <text x="${centro}" y="${centro + 7}" text-anchor="middle"
           font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
-          font-size="24" font-weight="700" fill="#fdfdfc">${fmt(total)}</text>
+          font-size="22" font-weight="700" fill="#fdfdfc">${fmt(total)}</text>
       </svg>`;
 
       return { svg, entradas, total };
@@ -307,7 +331,7 @@
       if (!p || p.total <= 0) {
         return '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
       }
-      const { svg, entradas, total } = desenharRosca(p.tags, p.cor);
+      const { svg, entradas, total } = desenharRosca(p.tags);
       const legenda = entradas.map(([tag, valor]) => `
         <div class="legenda-tag">
           <span class="rotulo"><span class="quad" style="background:${corDaTag(tag)}"></span>${tag}</span>
