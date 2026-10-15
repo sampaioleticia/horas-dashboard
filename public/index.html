@@ -163,6 +163,48 @@
     text-align: right;
   }
 
+  .grupo-tag {
+    padding: 2px 0 6px;
+  }
+
+  .grupo-tag + .grupo-tag {
+    border-top: 1px solid var(--border);
+    padding-top: 6px;
+  }
+
+  /* Subtópicos: cada "Descrição da Atividade" dentro da tag */
+  .subatividades {
+    margin: 0 0 4px 3px;
+    padding-left: 14px;
+    border-left: 1px solid color-mix(in srgb, var(--cor-tag) 45%, transparent);
+  }
+
+  .subatividade {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 3px 0;
+    /* alinha o tempo com a coluna de horas da tag (deixa espaço da %) */
+    padding-right: 40px;
+  }
+
+  .subatividade .desc {
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .subatividade .horas-sub {
+    font-family: var(--sans);
+    font-size: 12px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
   .vazio, .erro {
     font-family: var(--sans);
     font-size: 13px;
@@ -181,10 +223,18 @@
 
   <script>
     const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-    const PESSOAS_FIXAS = ['Giovanna', 'Ana Elisa', 'Ana Beatriz', 'Letícia'];
+    const PESSOAS_FIXAS = ['Giovanna', 'Ana Beatriz', 'Letícia'];
+    // Pessoas que não aparecem em nenhuma parte do painel (nem no Resumo)
+    const PESSOAS_OCULTAS = ['Ana Elisa', 'Ana Eliza'];
 
     let ultimoDado = null;
     let abaAtiva = 'resumo';
+
+    function escapar(txt) {
+      return String(txt).replace(/[&<>"']/g, (c) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
 
     function normalizar(txt) {
       return txt.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -318,8 +368,15 @@
       });
     }
 
+    function estaOculta(nome) {
+      const n = normalizar(nome);
+      return PESSOAS_OCULTAS.some((o) => n.includes(normalizar(o)));
+    }
+
     function renderizarResumo(dado) {
-      const pessoas = Object.entries(dado.pessoas).sort((a, b) => b[1].total - a[1].total);
+      const pessoas = Object.entries(dado.pessoas)
+        .filter(([nome]) => !estaOculta(nome))
+        .sort((a, b) => b[1].total - a[1].total);
       if (pessoas.length === 0) {
         return '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
       }
@@ -338,15 +395,30 @@
         return '<div class="vazio">Nenhum registro encontrado nesta semana.</div>';
       }
       const { svg, entradas, total } = desenharRosca(p.tags);
-      const legenda = entradas.map(([tag, valor]) => `
-        <div class="legenda-tag">
-          <span class="rotulo"><span class="quad" style="background:${corDaTag(tag)}"></span>${tag}</span>
-          <span class="valores">
-            <span class="horas-tag">${fmt(valor)}</span>
-            <span class="pct-tag">${Math.round((valor / total) * 100)}%</span>
-          </span>
-        </div>
-      `).join('');
+      const legenda = entradas.map(([tag, valor]) => {
+        const subs = Object.entries((p.atividades && p.atividades[tag]) || {})
+          .filter(([, v]) => v > 0)
+          .sort((a, b) => b[1] - a[1]);
+        const subHTML = subs.length ? `
+          <div class="subatividades" style="--cor-tag:${corDaTag(tag)}">
+            ${subs.map(([desc, h]) => `
+              <div class="subatividade">
+                <span class="desc" title="${escapar(desc)}">${escapar(desc)}</span>
+                <span class="horas-sub">${fmt(h)}</span>
+              </div>`).join('')}
+          </div>` : '';
+        return `
+        <div class="grupo-tag">
+          <div class="legenda-tag">
+            <span class="rotulo"><span class="quad" style="background:${corDaTag(tag)}"></span>${tag}</span>
+            <span class="valores">
+              <span class="horas-tag">${fmt(valor)}</span>
+              <span class="pct-tag">${Math.round((valor / total) * 100)}%</span>
+            </span>
+          </div>
+          ${subHTML}
+        </div>`;
+      }).join('');
       return `
         <div class="pessoa-layout">
           <div class="rosca-wrap">${svg}</div>
