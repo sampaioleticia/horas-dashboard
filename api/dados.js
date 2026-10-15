@@ -15,6 +15,7 @@ const PROP_PESSOA = process.env.PROP_PESSOA || 'Pessoa';
 const PROP_TAG = process.env.PROP_TAG || 'Tag';
 const PROP_TEMPO = process.env.PROP_TEMPO || 'Tempo';
 const PROP_INICIO = process.env.PROP_INICIO || 'Início';
+const PROP_DESCRICAO = process.env.PROP_DESCRICAO || 'Descrição da Atividade';
 
 // Propriedades numéricas usadas para somar o tempo de cada linha.
 // "Tempo" costuma ser uma fórmula de TEXTO (ex: "10 h e 3 min"), então
@@ -233,19 +234,27 @@ async function montarResposta() {
     const { inicio, fimExclusivo } = intervaloDaSemana();
     const paginas = await consultarNotion(inicio.toISOString(), fimExclusivo.toISOString());
 
-    const porPessoa = {}; // { nome: { total, cor, tags: { tag: horas } } }
+    // { nome: { total, cor, tags: { tag: horas }, atividades: { tag: { descricao: horas } } } }
+    const porPessoa = {};
 
     for (const pagina of paginas) {
       const props = pagina.properties;
       const nome = extrairTexto(props[PROP_PESSOA]) || 'Sem pessoa';
       const tag = extrairTexto(props[PROP_TAG]) || 'Sem tag';
+      const descricao = (extrairTexto(props[PROP_DESCRICAO]) || '').trim() || 'Sem descrição';
       const horas = extrairHorasDaLinha(props);
 
       if (!porPessoa[nome]) {
-        porPessoa[nome] = { total: 0, cor: corPara(nome), tags: {} };
+        porPessoa[nome] = { total: 0, cor: corPara(nome), tags: {}, atividades: {} };
       }
-      porPessoa[nome].total += horas;
-      porPessoa[nome].tags[tag] = (porPessoa[nome].tags[tag] || 0) + horas;
+      const p = porPessoa[nome];
+      p.total += horas;
+      p.tags[tag] = (p.tags[tag] || 0) + horas;
+
+      // Subtópicos: horas de cada "Descrição da Atividade" dentro da tag
+      // (descrições repetidas na mesma tag são somadas)
+      if (!p.atividades[tag]) p.atividades[tag] = {};
+      p.atividades[tag][descricao] = (p.atividades[tag][descricao] || 0) + horas;
     }
 
     return {
